@@ -1,0 +1,44 @@
+{
+  "name": "speed-meter",
+  "version": "1.0.0",
+  "description": "Internet Speed Meter for Windows",
+  "main": "main.js",
+  "author": "KunalPrashant2",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.speedmeter.app",
+    "productName": "Speed Meter",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Speed Meter",
+      "runAfterFinish": true
+    }
+  },
+  "dependencies": {
+    "electron-store": "8.1.0",
+    "systeminformation": "5.30.7"
+  },
+  "devDependencies": {
+    "electron": "40.2.1",
+    "electron-builder": "^23.6.0"
+  }
+}
