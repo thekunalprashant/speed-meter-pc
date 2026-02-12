@@ -1,24 +1,28 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain } = require("electron");
+const { app, BrowserWindow, Tray, Menu } = require("electron");
 const path = require("path");
 const Store = require("electron-store");
-const si = require("systeminformation");
+const { exec } = require("child_process");
 
 let win = null;
 let tray = null;
+let isQuitting = false;
+
+let previousRx = 0;
+let previousTx = 0;
+
 const store = new Store();
 
 /* ---------------------------------
-   CREATE MAIN WINDOW
+   CREATE WINDOW
 ----------------------------------- */
 function createWindow() {
-  // Load saved position
   const { x, y } = store.get("windowPosition", { x: null, y: null });
 
   win = new BrowserWindow({
     width: 200,
     height: 80,
-    x: x !== null ? x : undefined,
-    y: y !== null ? y : undefined,
+    x: x ?? undefined,
+    y: y ?? undefined,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -33,114 +37,127 @@ function createWindow() {
 
   win.loadFile("./renderer/index.html");
 
-  // Save drag position
   win.on("move", () => {
     const [newX, newY] = win.getPosition();
     store.set("windowPosition", { x: newX, y: newY });
   });
 
-  win.on("closed", () => {
-    win = null;
+  win.on("close", (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      win.hide();
+    }
   });
-
-  return win;
 }
 
-/* Hide from X button */
-ipcMain.on("hide-window", () => {
-  if (win) win.hide();
-});
-
 /* ---------------------------------
-   TRAY SETUP
+   TRAY
 ----------------------------------- */
 function createTray() {
   tray = new Tray(path.join(__dirname, "icon.png"));
 
-  /* ✔ Single-left-click tray toggles show/hide */
   tray.on("click", () => {
     if (!win) {
       createWindow();
-      setTimeout(() => {
-        win.show();
-      }, 200);
+      setTimeout(() => win.show(), 200);
       return;
     }
-
-    if (win.isVisible()) win.hide();
-    else win.show();
+    win.isVisible() ? win.hide() : win.show();
   });
 
-  /* Tray Menu */
   const menu = Menu.buildFromTemplate([
     {
       label: "Show",
-      click: () => {
-        if (!win) {
-          createWindow();
-          setTimeout(() => win.show(), 200);
-        } else {
-          win.show();
-        }
+      click: () => win.show()
+    },
+    {
+      label: "Start on Boot",
+      type: "checkbox",
+      checked: store.get("openOnBoot", false),
+      click: (item) => {
+        store.set("openOnBoot", item.checked);
+        app.setLoginItemSettings({ openAtLogin: item.checked });
       }
     },
-
-    {
-      label: "Settings",
-      submenu: [
-        {
-          label: "Start on Boot",
-          type: "checkbox",
-          checked: store.get("openOnBoot", false),
-          click: (item) => {
-            store.set("openOnBoot", item.checked);
-            app.setLoginItemSettings({ openAtLogin: item.checked });
-          }
-        }
-      ]
-    },
-
     { type: "separator" },
-
     {
       label: "Exit",
-      click: () => app.quit()
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
     }
   ]);
 
-  tray.setToolTip("Internet Speed Meter");
   tray.setContextMenu(menu);
+  tray.setToolTip("Internet Speed Meter");
 }
 
 /* ---------------------------------
-   SPEED FORMAT
+   FORMAT SPEED
 ----------------------------------- */
-function formatSpeed(kb) {
+function formatSpeed(bytesPerSec) {
+  const kb = bytesPerSec / 1024;
+
   if (kb < 1024) return `${kb.toFixed(1)} KB/s`;
+
   const mb = kb / 1024;
   if (mb < 1024) return `${mb.toFixed(2)} MB/s`;
+
   return `${(mb / 1024).toFixed(2)} GB/s`;
 }
 
 /* ---------------------------------
-   SEND SPEED
+   FETCH SPEED USING NETSTAT
 ----------------------------------- */
-function sendSpeed() {
-  si.networkStats().then(stats => {
-    const active = stats.find(n => n.operstate === "up") || stats[0];
-    if (!active || !win) return;
+function updateSpeed() {
+  exec("netstat -e", (err, stdout) => {
+    if (err || !stdout || !win) return;
+
+    const lines = stdout.split("\n");
+    const dataLine = lines.find(line => line.trim().startsWith("Bytes"));
+
+    if (!dataLine) return;
+
+    const parts = dataLine.trim().split(/\s+/);
+    const rx = parseInt(parts[1], 10);
+    const tx = parseInt(parts[2], 10);
+
+    if (previousRx === 0) {
+      previousRx = rx;
+      previousTx = tx;
+      return;
+    }
+
+    const down = rx - previousRx;
+    const up = tx - previousTx;
+
+    previousRx = rx;
+    previousTx = tx;
 
     win.webContents.send("speed-data", {
-      down: formatSpeed(active.rx_sec / 1024),
-      up: formatSpeed(active.tx_sec / 1024)
+      down: formatSpeed(down / 2),
+      up: formatSpeed(up / 2)
     });
   });
 }
 
-app.on("window-all-closed", (e) => e.preventDefault());
+/* ---------------------------------
+   LOOP
+----------------------------------- */
+function startLoop() {
+  function loop() {
+    if (isQuitting) return;
+
+    updateSpeed();
+    setTimeout(loop, 2000);
+  }
+
+  loop();
+}
 
 /* ---------------------------------
-   APP READY
+   APP START
 ----------------------------------- */
 app.whenReady().then(() => {
   createWindow();
@@ -150,5 +167,7 @@ app.whenReady().then(() => {
     app.setLoginItemSettings({ openAtLogin: true });
   }
 
-  setInterval(sendSpeed, 1000);
+  startLoop();
 });
+
+app.on("window-all-closed", (e) => e.preventDefault());

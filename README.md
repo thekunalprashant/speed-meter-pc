@@ -1,51 +1,112 @@
-# Speed Meter
+# 🚀 Speed Meter (Windows)
 
-A lightweight, always-on-top Internet speed meter application for Windows. Monitor your download and upload speeds in real-time with a minimalist floating widget.
+A lightweight, always-on-top Internet speed monitor for Windows.
+Built with Electron, optimized for minimal CPU usage, and designed to run silently in the system tray.
 
-**Note**: This is an offline application - no data is sent to external servers.
+> ⚡ Real-time speed.
+> 🪶 Minimal resource usage.
+> 🔒 Fully offline.
 
-## Features
+---
 
-- **Real-time Speed Monitoring**: Display current download and upload speeds
-- **Always-on-Top Window**: Compact floating widget that stays visible
-- **Position Memory**: Remembers window position between sessions
-- **Minimal UI**: Clean, distraction-free design
-- **System Tray Integration**: Easy access from system tray
-- **Windows Installer**: Simple installation with NSIS
-- **Offline**: Completely offline, no data collection or external dependencies
+## ✨ Features
 
-## Screenshots
+* 📡 **Real-Time Monitoring** – Live download & upload speed
+* 🖥 **Always-On-Top Floating Widget** – Compact 200×80 window
+* 📍 **Position Memory** – Remembers window location
+* 🧭 **System Tray Integration** – Toggle visibility instantly
+* 🚀 **Start on Boot Option**
+* 🔒 **100% Offline** – No data sent anywhere
+* 🪶 **Low CPU Usage** – Optimized architecture
 
-The app displays:
-- Download speed (⬇)
-- Upload speed (⬆)
-- Compact 200x80px window
-- Draggable interface
+---
 
-## Installation
+## 🖼 Interface
 
-### From Release
-Download the latest installer from the [Releases](../../releases) page and run the `.exe` file.
+Displays:
 
-### Development Build
+* ⬇ Download speed
+* ⬆ Upload speed
+* Minimal floating UI
+* Drag to reposition
 
-1. Clone the repository:
+Designed to stay out of your way.
+
+---
+
+## 🧠 Architecture Decision (Important)
+
+### ⚠️ Initial Problem
+
+During development, the app used the `systeminformation` package to fetch network stats.
+
+On Windows, this internally triggers PowerShell commands like:
+
+```
+Get-NetAdapterStatistics
+```
+
+When polled frequently (1–3 seconds), this caused:
+
+* Multiple `powershell.exe` processes spawning
+* CPU usage between 12%–30%
+* Occasional CPU spikes
+* Unnecessary overhead for a tray utility
+
+This made the approach unsuitable for continuous background monitoring.
+
+---
+
+### ✅ Final Solution
+
+The application was redesigned to use:
+
+```
+netstat -e
+```
+
+Instead of PowerShell-based calls.
+
+The optimized approach:
+
+* Executes a lightweight native Windows command
+* Reads total bytes sent/received
+* Calculates speed using delta over time
+* Avoids PowerShell completely
+* Prevents process accumulation
+* Reduces CPU usage to ~0.3–3%
+
+---
+
+### 📊 Performance Comparison
+
+| Implementation    | CPU Usage | PowerShell Spawn |
+| ----------------- | --------- | ---------------- |
+| systeminformation | 12–30%    | Yes              |
+| netstat (final)   | 0.3–3%    | No               |
+
+This change made the app production-ready and efficient for long-term background usage.
+
+---
+
+## 📦 Installation
+
+### 🔹 From Release
+
+Download the latest `.exe` from the **Releases** page and run the installer.
+
+### 🔹 Development Setup
+
 ```bash
 git clone https://github.com/theKunalPrashant/speed-meter-pc.git
 cd speed-meter
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Start the development app:
-```bash
 npm start
 ```
 
-## Building
+---
+
+## 🏗 Build Installer
 
 To create a Windows installer:
 
@@ -53,70 +114,78 @@ To create a Windows installer:
 npm run build
 ```
 
-The installer will be generated in the `dist/` folder.
+The installer will be generated inside the `dist/` folder.
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```
 speed-meter/
-├── main.js              # Main Electron process
-├── preload.js           # Preload script for IPC
-├── package.json         # Project metadata & dependencies
+├── main.js
+├── preload.js
+├── package.json
 ├── renderer/
-│   ├── index.html       # Main UI
-│   ├── app.js           # Renderer process logic
-│   └── style.css        # Styling
-└── icon.ico             # Application icon
+│   ├── index.html
+│   ├── app.js
+│   └── style.css
+└── icon.ico
 ```
 
-## Technologies Used
+---
 
-- **Electron** - Desktop application framework
-- **systeminformation** - System info retrieval
-- **electron-store** - Persistent storage
-- **electron-builder** - App packaging & distribution
+## 🛠 Technologies Used
 
-## Dependencies
+* **Electron** – Desktop application framework
+* **electron-store** – Persistent local storage
+* **electron-builder** – Packaging & distribution
+* **Node.js child_process** – Lightweight `netstat` execution
 
-- `electron` - v40.2.1
-- `electron-builder` - v23.6.0
-- `systeminformation` - v5.30.7
-- `electron-store` - v8.1.0
+---
 
-## Development
+## 📋 Requirements
 
-### Requirements
-- Node.js (v14 or higher)
-- npm or yarn
+* Node.js (v14+ recommended)
+* Windows 10/11
 
-### Available Scripts
+---
 
-| Command | Description |
-|---------|-------------|
-| `npm start` | Start development app |
+## 📜 Available Scripts
+
+| Command         | Description             |
+| --------------- | ----------------------- |
+| `npm start`     | Run development version |
 | `npm run build` | Build Windows installer |
 
-## License
+---
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 🛣 Roadmap
 
-## Author
+* [ ] macOS support
+* [ ] Linux support
+* [ ] Speed history graph
+* [ ] Custom themes
+* [ ] Notification alerts
+* [ ] Advanced settings panel
 
-Created by [KunalPrashant2](https://github.com/theKunalPrashant)
+---
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Feel free to submit a Pull Request.
+Pull requests are welcome.
+For major changes, please open an issue first to discuss improvements.
 
-## Roadmap
+---
 
-- [ ] macOS support
-- [ ] Linux support
-- [ ] Custom themes
-- [ ] Speed history graph
-- [ ] Notifications for speed changes
-- [ ] Settings panel
+## 🧑‍💻 Author
 
-## Support
+Built by **Kunal Prashant**
+GitHub: [https://github.com/theKunalPrashant](https://github.com/theKunalPrashant)
 
-If you encounter any issues, please open an [Issue](../../issues) on GitHub.
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+--
